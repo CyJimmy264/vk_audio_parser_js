@@ -1,3 +1,6 @@
+/*
+  VK Audio Url Decode
+*/
 var id = 13370370;
 var n = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN0PQRSTUVWXYZO123456789+/=",
     i = {
@@ -65,16 +68,10 @@ function r(e, t) {
   return i
 }
 
-new_tracks = 0
-printed_rows = []
-track_names = ''
-track_names_count = 0
 
-xspf = `<?xml version="1.0" encoding="UTF-8"?>
-<playlist version="1" xmlns="http://xspf.org/ns/0/">
-  <trackList>
-`
-
+/*
+  Utils
+*/
 function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 function encodeHTMLEntities(text) {
@@ -82,6 +79,18 @@ function encodeHTMLEntities(text) {
   textArea.innerText = text;
   return textArea.innerHTML;
 }
+
+Object.defineProperty(Array.prototype, 'chunk', {value: function(n) {
+  return Array.from(Array(Math.ceil(this.length/n)), (_,i)=>this.slice(i*n,i*n+n));
+}});
+
+
+/*
+  Playlist Scraping
+*/
+new_tracks = 0
+printed_rows = []
+track_list_no_urls = []
 
 do {
   new_tracks = 0
@@ -97,56 +106,15 @@ do {
       performers = audio_row.querySelector('.audio_row__performers').textContent
       title = audio_row.querySelector('.audio_row__title_inner').textContent
       subtitle = audio_row.querySelector('.audio_row__title_inner_subtitle').textContent
+      title_subtitle = title + ((subtitle.length > 0) ? ' (' + subtitle + ')' : '')
 
       audioHashes = audio[13].split('/')
       actionHash = audioHashes[2]
       urlHash = audioHashes[5]
 
-      response = await fetch("https://vk.com/al_audio.php?act=reload_audio", {
-        "headers": {
-          "accept": "*/*",
-          "accept-language": "ru,en;q=0.9",
-          "content-type": "application/x-www-form-urlencoded",
-          "sec-ch-ua": "\"Yandex\";v=\"21\", \" Not;A Brand\";v=\"99\", \"Chromium\";v=\"93\"",
-          "sec-ch-ua-mobile": "?0",
-          "sec-ch-ua-platform": "\"Linux\"",
-          "sec-fetch-dest": "empty",
-          "sec-fetch-mode": "cors",
-          "sec-fetch-site": "same-origin",
-          "x-requested-with": "XMLHttpRequest"
-        },
-        "referrer": "https://vk.com/audios13370370",
-        "referrerPolicy": "strict-origin-when-cross-origin",
-        "body": "al=1&ids=" + fullId + "_" + actionHash + "_" + urlHash,
-        "method": "POST",
-        "mode": "cors",
-        "credentials": "include"
-      })
+      console.log(performers + ' — ' + title_subtitle)
 
-      reload_audio_json = await response.json()
-      encoded_audio_url = reload_audio_json.payload[1][0][0][2]
-      duration = reload_audio_json.payload[1][0][0][5]
-      console.log(encoded_audio_url)
-      audio_url = s(encoded_audio_url)
-
-      track_name = performers + ' — ' + title
-      track_name += (subtitle.length > 0) ? ' (' + subtitle + ')' : ''
-
-      track_title = title + ((subtitle.length > 0) ? ' (' + subtitle + ')' : '')
-
-      track_names += track_name + '\n'
-      track_names_count ++
-      console.log(track_name)
-
-      xspf += `    <track>
-      <location>` + audio_url + `</location>
-      <title>` + encodeHTMLEntities(track_title) + `</title>
-      <creator>` + encodeHTMLEntities(performers) + `</creator>
-      <duration>` + duration + `000</duration>
-    </track>
-`
-
-      await delay(1500)
+      track_list_no_urls.push([fullId, actionHash, urlHash, title_subtitle, performers])
 
       new_tracks ++
     }
@@ -158,9 +126,80 @@ do {
 } while (new_tracks > 0)
 
 
+/*
+  Getting urls and making XSPF
+*/
+xspf = `<?xml version="1.0" encoding="UTF-8"?>
+<playlist version="1" xmlns="http://xspf.org/ns/0/">
+  <trackList>
+`
+
+track_list_chunks = track_list_no_urls.chunk(10)
+chunk_counter = 0
+for (const track_list_chunk of track_list_chunks) {
+  ids = track_list_chunk
+    .filter(track => { return track[0].length > 0 && track[1].length > 0 && track[2].length > 0 })
+    .map(track => { return track[0] + "_" + track[1] + "_" + track[2] })
+    .join(',')
+
+  no_url_indexes = track_list_chunk
+    .map((track, index) => { return (track[0].length <= 0 || track[1].length <= 0 || track[2].length <= 0) ? index : -1 })
+    .filter(index => { return index >= 0 })
+
+  response = await fetch("https://vk.com/al_audio.php?act=reload_audio", {
+    "headers": {
+      "accept": "*/*",
+      "accept-language": "ru,en;q=0.9",
+      "content-type": "application/x-www-form-urlencoded",
+      "sec-ch-ua": "\"Yandex\";v=\"21\", \" Not;A Brand\";v=\"99\", \"Chromium\";v=\"93\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Linux\"",
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": "same-origin",
+      "x-requested-with": "XMLHttpRequest"
+    },
+    "referrer": "https://vk.com/audios" + id,
+    "referrerPolicy": "strict-origin-when-cross-origin",
+    "body": "al=1&ids=" + ids,
+    "method": "POST",
+    "mode": "cors",
+    "credentials": "include"
+  })
+  reload_audio_json = await response.json()
+
+  while (no_url_indexes.length > 0) {
+    shifted = no_url_indexes.shift()
+    reload_audio_json.payload[1][0].splice(shifted, 0, ['', '', 'no url', '', '', -1])
+  }
+
+  console.log('chunk: ' + chunk_counter++)
+
+  xspf += track_list_chunk
+    .map((track, index) => {
+      encoded_audio_url = reload_audio_json.payload[1][0][index][2]
+      duration = reload_audio_json.payload[1][0][index][5]
+
+      audio_url = 'no url'
+      try {
+        audio_url = s(encoded_audio_url)
+      } catch(e) {
+        audio_url = encoded_audio_url
+      }
+      console.log(audio_url)
+
+      return `    <track>
+      <location>` + audio_url + `</location>
+      <title>` + encodeHTMLEntities(track[3]) + `</title>
+      <creator>` + encodeHTMLEntities(track[4]) + `</creator>
+      <duration>` + duration + `000</duration>
+    </track>
+` })
+    .join('')
+
+  await delay(3000)
+}
+
 xspf += `  </trackList>
 </playlist>
 `
-
-console.log(track_names)
-console.log(track_names_count)
