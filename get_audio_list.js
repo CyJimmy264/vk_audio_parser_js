@@ -167,20 +167,51 @@ for (const track_list_chunk of track_list_chunks) {
     "credentials": "include"
   })
   reload_audio_json = await response.json()
+  reload_audio_tracks = reload_audio_json.payload[1][0]
 
   while (no_url_indexes.length > 0) {
     shifted = no_url_indexes.shift()
-    reload_audio_json.payload[1][0].splice(shifted, 0, ['', '', 'no url', '', '', -1])
+    reload_audio_tracks.splice(shifted, 0, ['', '', 'https://m.vk.com/mp3/audio_api_unavailable.mp3', '', '', 25])
   }
 
+  for (const [index, reload_audio_track] of reload_audio_tracks.entries()) {
+    while (reload_audio_tracks[index][2].length <= 0) {
+      console.log('repeat request for empty url')
+      response = await fetch("https://vk.com/al_audio.php?act=reload_audio", {
+        "headers": {
+          "accept": "*/*",
+          "accept-language": "ru,en;q=0.9",
+          "content-type": "application/x-www-form-urlencoded",
+          "sec-ch-ua": "\"Yandex\";v=\"21\", \" Not;A Brand\";v=\"99\", \"Chromium\";v=\"93\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"Linux\"",
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "x-requested-with": "XMLHttpRequest"
+        },
+        "referrer": "https://vk.com/audios" + id,
+        "referrerPolicy": "strict-origin-when-cross-origin",
+        "body": "al=1&ids=" + track_list_chunk[index][0] + "_" + track_list_chunk[index][1] + "_" + track_list_chunk[index][2],
+        "method": "POST",
+        "mode": "cors",
+        "credentials": "include"
+      })
+      reload_audio_json = await response.json()
+
+      reload_audio_tracks[index] = reload_audio_json.payload[1][0][0]
+
+      await delay(3000)
+    }
+  }
   console.log('chunk: ' + chunk_counter++)
 
   xspf += track_list_chunk
     .map((track, index) => {
-      encoded_audio_url = reload_audio_json.payload[1][0][index][2]
-      duration = reload_audio_json.payload[1][0][index][5]
+      encoded_audio_url = reload_audio_tracks[index][2]
+      duration = reload_audio_tracks[index][5]
 
-      audio_url = 'no url'
+      audio_url = ''
       try {
         audio_url = s(encoded_audio_url)
       } catch(e) {
