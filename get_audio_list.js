@@ -38,7 +38,7 @@ function o() {
 }
 
 function s(e) {
-  if (!o() && ~e.indexOf("audio_api_unavailable")) {
+  if (!o() && e.includes("audio_api_unavailable") && e.includes("extra")) {
     var t = e.split("?extra=")[1].split("#"),
         n = "" === t[1] ? "" : a(t[1]);
     if (t = a(t[0]), "string" != typeof n || !t) return e;
@@ -94,7 +94,7 @@ track_list_no_urls = []
 
 do {
   new_tracks = 0
-  audio_rows = document.querySelectorAll('.audio_page__audio_rows_list .audio_row')
+  audio_rows = document.querySelectorAll('._audio_pl .audio_row')
 
   for (const audio_row of audio_rows) {
     fullId = audio_row.dataset.fullId
