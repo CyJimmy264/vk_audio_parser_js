@@ -1,6 +1,8 @@
 /*
   VK Audio Url Decode
 */
+var skip_scrolling = true;
+var only_first_ten = true;
 var id = 13370370;
 var n = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN0PQRSTUVWXYZO123456789+/=",
     i = {
@@ -94,7 +96,7 @@ track_list_no_urls = []
 
 do {
   new_tracks = 0
-  audio_rows = document.querySelectorAll('._audio_pl .audio_row')
+  audio_rows = document.querySelectorAll('.CatalogBlock__my_audios ._audio_pl .audio_row')
 
   for (const audio_row of audio_rows) {
     fullId = audio_row.dataset.fullId
@@ -120,7 +122,7 @@ do {
     }
   }
 
-  audio_rows[audio_rows.length - 1].scrollIntoView()
+  if (!skip_scrolling) audio_rows[audio_rows.length - 1].scrollIntoView()
 
   await delay(1000)
 } while (new_tracks > 0)
@@ -227,6 +229,8 @@ for (const track_list_chunk of track_list_chunks) {
     </track>
 ` })
     .join('')
+
+  if (only_first_ten) break
 
   await delay(3000)
 }
