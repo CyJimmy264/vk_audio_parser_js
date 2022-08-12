@@ -31,8 +31,10 @@
 /*
   VK Audio Url Decode
 */
-var skip_scrolling = true;
-var only_first_ten = true;
+var skip_scrolling = false;
+var only_first_ten = false;
+var pages_limit = 3;
+
 var id = 13370370;
 var n = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN0PQRSTUVWXYZO123456789+/=",
     i = {
@@ -112,9 +114,13 @@ function encodeHTMLEntities(text) {
   return textArea.innerHTML;
 }
 
-Object.defineProperty(Array.prototype, 'chunk', {value: function(n) {
-  return Array.from(Array(Math.ceil(this.length/n)), (_,i)=>this.slice(i*n,i*n+n));
-}});
+if (typeof [].chunk === 'undefined') {
+  Object.defineProperty(Array.prototype, 'chunk', {
+    configurable: true, value: function (n) {
+      return Array.from(Array(Math.ceil(this.length / n)), (_, i) => this.slice(i * n, i * n + n));
+    }
+  });
+}
 
 
 /*
@@ -123,10 +129,11 @@ Object.defineProperty(Array.prototype, 'chunk', {value: function(n) {
 new_tracks = 0
 printed_rows = []
 track_list_no_urls = []
+pages_count = 0
 
 do {
   new_tracks = 0
-  audio_rows = document.querySelectorAll('.CatalogBlock__my_audios ._audio_pl .audio_row')
+  audio_rows = document.querySelectorAll('[data-audio-context="my_audios"] .audio_row')
 
   for (const audio_row of audio_rows) {
     fullId = audio_row.dataset.fullId
@@ -152,6 +159,9 @@ do {
     }
   }
 
+  pages_count ++
+
+  if (pages_count >= pages_limit) break
   if (!skip_scrolling) audio_rows[audio_rows.length - 1].scrollIntoView()
 
   await delay(1000)
